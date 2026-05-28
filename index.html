@@ -335,6 +335,7 @@ let S={
   asignaciones:{},
   grupos:{A:[],B:[]},
   sorted:false,
+  gruposVisible:false,
   partidos:[],
   ko:KO_TEMPLATE()
 };
@@ -496,7 +497,7 @@ function blanquearSorteo(){
   if(!Object.values(S.asignaciones).some(a=>Object.keys(a).length>0)){notif('No hay equipos que blanquear');return;}
   if(!confirm('¿Blanquear todos los equipos asignados? Los grupos y partidos también se resetearán.'))return;
   AMIGOS.forEach(a=>{S.asignaciones[a]={};});
-  S.grupos={A:[],B:[]};S.sorted=false;S.partidos=[];S.ko=KO_TEMPLATE();
+  S.grupos={A:[],B:[]};S.sorted=false;S.gruposVisible=false;S.partidos=[];S.ko=KO_TEMPLATE();
   save();
   // reset drum UI
   document.getElementById('drum-team').textContent='???';
@@ -606,13 +607,40 @@ function renderBombos(){
 
 // ── GRUPOS ───────────────────────────────────────────────
 function sortearGrupos(){
-  if(S.sorted&&!confirm('¿Re-sortear grupos? Se resetearán los partidos y eliminatorias.'))return;
   const sh=[...AMIGOS].sort(()=>Math.random()-.5);
   S.grupos.A=sh.slice(0,4);S.grupos.B=sh.slice(4,8);
   S.sorted=true;
   S.partidos=[...mkPartidos('A'),...mkPartidos('B')];
   S.ko=KO_TEMPLATE();
-  save();confetti();notif('¡Grupos sorteados! ⚽');renderGrupos();
+  // Mostrar animación de suspenso antes de revelar
+  const el=document.getElementById('grupos-content');
+  el.innerHTML=`<div class="card" style="text-align:center;padding:40px">
+    <div style="font-family:'Bebas Neue',sans-serif;font-size:28px;letter-spacing:4px;color:var(--gold);margin-bottom:20px">SORTEANDO GRUPOS...</div>
+    <div id="sorteo-nombres" style="font-family:'Bebas Neue',sans-serif;font-size:22px;letter-spacing:2px;color:var(--text);min-height:36px"></div>
+    <div style="margin-top:20px;background:var(--card2);border-radius:8px;height:6px;overflow:hidden">
+      <div id="sorteo-prog" style="height:100%;background:linear-gradient(90deg,var(--g),var(--gold));width:0%;transition:width .1s linear;border-radius:8px"></div>
+    </div>
+  </div>`;
+  let tick=0;const total=32;
+  const allNames=[...AMIGOS,...AMIGOS,...AMIGOS,...AMIGOS].sort(()=>Math.random()-.5);
+  const iv=setInterval(()=>{
+    document.getElementById('sorteo-nombres').textContent=allNames[tick%allNames.length];
+    document.getElementById('sorteo-prog').style.width=`${Math.round((tick/total)*100)}%`;
+    tick++;
+    if(tick>total){
+      clearInterval(iv);
+      S.gruposVisible=true;
+      save();confetti();notif('¡Grupos sorteados! ⚽');
+      updateTabLocks();renderGrupos();
+    }
+  },80);
+}
+
+function resortearGrupos(){
+  if(!confirm('¿Re-sortear grupos? Se resetearán los partidos y eliminatorias.'))return;
+  S.sorted=false;S.gruposVisible=false;
+  S.partidos=[];S.ko=KO_TEMPLATE();
+  save();updateTabLocks();renderGrupos();
 }
 function mkPartidos(g){
   const pl=S.grupos[g],ms=[];let n=1;
@@ -642,11 +670,16 @@ function renderGrupos(){
     </div>`;
     return;
   }
-  if(!S.sorted){
-    el.innerHTML=`<div class="card text-center">
+  if(!S.sorted||!S.gruposVisible){
+    el.innerHTML=`<div class="card" style="text-align:center">
       <div class="card-title" style="justify-content:center">⚽ Fase de Grupos</div>
-      <div class="empty-state"><div class="big">🎲</div><p>Sortea los grupos para repartir a los 8 jugadores en dos grupos de 4.</p></div>
-      <button class="btn btn-primary btn-full" style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;margin-top:14px" onclick="sortearGrupos()">🎲 SORTEAR GRUPOS</button>
+      <div class="empty-state">
+        <div class="big">🎲</div>
+        <p>${S.sorted?'Los grupos ya fueron sorteados.<br>¿Listo para revelarlos?':'Sortea los grupos para repartir a los 8 jugadores en dos grupos de 4.'}</p>
+      </div>
+      <button class="btn btn-primary btn-full" style="font-family:'Bebas Neue',sans-serif;font-size:18px;letter-spacing:2px;margin-top:14px" onclick="sortearGrupos()">
+        ${S.sorted?'🎲 REVELAR GRUPOS':'🎲 SORTEAR GRUPOS'}
+      </button>
     </div>`;return;
   }
   const stA=getStandings('A'),stB=getStandings('B');
@@ -656,7 +689,7 @@ function renderGrupos(){
     <div class="sec-hdr">
       <div class="card-title" style="margin-bottom:0">⚽ Fase de Grupos</div>
       <div style="display:flex;gap:7px;flex-wrap:wrap">
-        <button class="btn btn-secondary btn-sm" onclick="sortearGrupos()">🔀 Re-sortear</button>
+        <button class="btn btn-secondary btn-sm" onclick="resortearGrupos()">🔀 Re-sortear</button>
         ${allDone?`<button class="btn btn-gold btn-sm" onclick="populateKO();goTabName('elim')">🥊 Ver Eliminatorias</button>`:''}
       </div>
     </div>
@@ -1195,7 +1228,7 @@ function exportarExcel(){
 function doReset(){
   if(!confirm('¿Reiniciar TODO? Se borrarán equipos, grupos, partidos y eliminatorias.'))return;
   AMIGOS.forEach(a=>{S.asignaciones[a]={};});
-  S.grupos={A:[],B:[]};S.sorted=false;S.partidos=[];S.ko=KO_TEMPLATE();
+  S.grupos={A:[],B:[]};S.sorted=false;S.gruposVisible=false;S.partidos=[];S.ko=KO_TEMPLATE();
   save();renderBombos();renderRegistro();renderGrupos();renderElim();updateTabLocks();
   document.getElementById('sel-amigo').value='';document.getElementById('sel-bombo').value='';
   document.getElementById('drum-team').textContent='???';document.getElementById('drum-team').className='drum-team';
