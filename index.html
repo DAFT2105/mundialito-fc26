@@ -487,7 +487,7 @@ async function simularTodo(){
   btnSim.textContent='🚀 SIMULAR SORTEO COMPLETO';
   btnSort.disabled=false;
 
-  save();updateSorteoUI();renderBombos();renderRegistro();
+  save();updateSorteoUI();renderBombos();renderRegistro();updateTabLocks();
   confetti();setTimeout(confetti,600);
   notif(`¡${total} equipo${total>1?'s':''} asignado${total>1?'s':''} automáticamente! 🎉`);
 }
@@ -585,7 +585,7 @@ function confirmarSorteo(){
   document.getElementById('btn-confirm').classList.remove('show');
   document.getElementById('btn-sort').textContent='✅ Ya sorteado';
   notif(`¡${amigo} recibió ${equipo}! 🎉`);
-  renderBombos();renderRegistro();
+  renderBombos();renderRegistro();updateTabLocks();
 }
 
 // ── BOMBOS ───────────────────────────────────────────────
@@ -624,6 +624,24 @@ function mkPartidos(g){
 
 function renderGrupos(){
   const el=document.getElementById('grupos-content');
+  // Verificar que todos tengan sus 6 equipos
+  const totalAsignados=Object.values(S.asignaciones).reduce((sum,a)=>sum+Object.keys(a).length,0);
+  const sorteoCompleto=totalAsignados===48;
+  if(!sorteoCompleto){
+    const faltan=48-totalAsignados;
+    el.innerHTML=`<div class="card">
+      <div class="card-title">⚽ Fase de Grupos</div>
+      <div class="empty-state">
+        <div class="big">🔒</div>
+        <p>El sorteo de equipos no está completo.<br>
+        Faltan <strong style="color:var(--gold)">${faltan} equipo${faltan>1?'s':''}</strong> por asignar antes de sortear los grupos.</p>
+        <div style="margin-top:18px">
+          <button class="btn btn-primary" onclick="goTabName('sorteo')">🎲 Ir al Sorteo</button>
+        </div>
+      </div>
+    </div>`;
+    return;
+  }
   if(!S.sorted){
     el.innerHTML=`<div class="card text-center">
       <div class="card-title" style="justify-content:center">⚽ Fase de Grupos</div>
@@ -752,7 +770,7 @@ function savePartido(id){
   p.gL=gl;p.gV=gv;p.done=true;
   save();notif(`${p.local} ${gl} – ${gv} ${p.visit} ✅`);
   if(S.partidos.every(x=>x.done)){populateKO();notif('🥊 ¡Grupos terminados! Pasa a Eliminatorias');}
-  renderGrupos();
+  renderGrupos();updateTabLocks();
 }
 function editPartido(id){
   const p=S.partidos.find(x=>x.id===id);if(!p)return;
@@ -1062,6 +1080,17 @@ function exportarExcel(){
   notif('Excel exportado exitosamente ✅');
 }
 
+// ── TAB LOCKS ────────────────────────────────────────────
+function updateTabLocks(){
+  const totalAsig=Object.values(S.asignaciones).reduce((s,a)=>s+Object.keys(a).length,0);
+  const sorteoOk=totalAsig===48;
+  const gruposOk=sorteoOk&&S.sorted&&S.partidos.length>0&&S.partidos.every(p=>p.done);
+  const tabGrupos=document.querySelector('.tab-btn[onclick*="\'grupos\'"]');
+  const tabElim=document.querySelector('.tab-btn[onclick*="\'elim\'"]');
+  if(tabGrupos){tabGrupos.innerHTML=sorteoOk?'⚽ Grupos':'🔒 Grupos';tabGrupos.style.opacity=sorteoOk?'1':'0.5';}
+  if(tabElim){tabElim.innerHTML=gruposOk?'🥊 Eliminatorias':'🔒 Eliminatorias';tabElim.style.opacity=gruposOk?'1':'0.5';}
+}
+
 // ── RESET ────────────────────────────────────────────────
 // ── EXPORTAR EXCEL ───────────────────────────────────────
 function exportarExcel(){
@@ -1167,7 +1196,7 @@ function doReset(){
   if(!confirm('¿Reiniciar TODO? Se borrarán equipos, grupos, partidos y eliminatorias.'))return;
   AMIGOS.forEach(a=>{S.asignaciones[a]={};});
   S.grupos={A:[],B:[]};S.sorted=false;S.partidos=[];S.ko=KO_TEMPLATE();
-  save();renderBombos();renderRegistro();renderGrupos();renderElim();
+  save();renderBombos();renderRegistro();renderGrupos();renderElim();updateTabLocks();
   document.getElementById('sel-amigo').value='';document.getElementById('sel-bombo').value='';
   document.getElementById('drum-team').textContent='???';document.getElementById('drum-team').className='drum-team';
   document.getElementById('drum-flag').textContent='⚽';document.getElementById('btn-sort').textContent='🎲 ¡SORTEAR!';
@@ -1175,7 +1204,7 @@ function doReset(){
 }
 
 // ── INIT ─────────────────────────────────────────────────
-load();initSorteoSelects();renderBombos();renderRegistro();
+load();initSorteoSelects();renderBombos();renderRegistro();updateTabLocks();
 </script>
 
 </body>
